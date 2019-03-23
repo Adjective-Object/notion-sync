@@ -6,7 +6,8 @@ verify_ssl = true
 [dev-packages]
 
 [packages]
-requests = {editable = true,git = "https://github.com/evertheylen/notion-py.git"}
+notion = {editable = true,git = "https://github.com/evertheylen/notion-py.git"}
+shutil = {editable = true,version = "*"}
 
 [requires]
 python_version = "3.7"
