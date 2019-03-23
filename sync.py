@@ -35,6 +35,13 @@ def get_post_meta(row):
     print(row.title, tags)
     return '---\ntitle: %s\ntags: %s\n---' % (row.title, ', '.join(tags))
 
+def indent_children(children):
+    return ''.join([
+        '  ' + get_markdown_from_page(child).replace('\n', '\n  ')
+        for child in children
+    ])
+
+
 def get_markdown_from_page(block):
     print('traverse', block)
     if type(block) is notion.collection.CollectionRowBlock:
@@ -52,17 +59,11 @@ def get_markdown_from_page(block):
         return '### ' + notion_to_markdown(block._get_record_data()['properties']['title'])
     elif type(block) is notion.block.BulletedListBlock:
         row = '- ' + block.title
-        subrows = ''.join([
-            '  ' + get_markdown_from_page(child).replace('\n', '\n  ')
-            for child in block.children
-        ])
+        subrows = indent_children(block.children)
         return row + '\n' + subrows
     elif type(block) is notion.block.NumberedListBlock:
         row = '1. ' + block.title
-        subrows = ''.join([
-            '  ' + get_markdown_from_page(child).replace('\n', '\n  ')
-            for child in block.children
-        ])
+        subrows = indent_children(block.children)
         return row + '\n' + subrows
     elif type(block) is notion.block.ColumnListBlock:
         subsections = '\n'.join([
@@ -81,6 +82,20 @@ def get_markdown_from_page(block):
             os.path.basename(raw_source),
             block.source
         )
+    elif type(block) is notion.block.CodeBlock:
+        code_source = block.title
+        code_language = block.language
+        return '```%s\n%s\n```' % (
+            code_language,
+            code_source
+        )
+    elif type(block) is notion.block.QuoteBlock:
+        quote_body = block.title
+        return '> ' + '\n> '.join(quote_body.split('\n'))
+    elif type(block) is notion.block.TodoBlock:
+        row = '[%s] %s' % ('x' if block.checked else ' ', block.title)
+        subrows = indent_children(block.children)
+        return row + '\n' + subrows 
     else:
         print(type(block), block, block._get_record_data())
         return str(block)
