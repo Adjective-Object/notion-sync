@@ -4,6 +4,7 @@
 - Add columns for
   - Publish Date (type date)
   - Status (type select, with Published as an option)
+  - Tags (type multi_select)
 
 ## Setting up the Tool
 

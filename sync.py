@@ -5,6 +5,7 @@ import os, sys, errno
 import asyncio
 import json
 from datetime import date
+from itertools import chain
 
 def init():
     with open('./config.json') as config_file:
@@ -24,16 +25,23 @@ def silent_rm(filename):
         if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
             raise # re-raise exception if a different error occurred
 
+def get_post_meta(row):
+    tags = chain(*[
+        row.get_property(entry['id'])
+            for entry in row.schema
+                if (entry['name'] == "Tags"
+                   and entry['type'] == 'multi_select')
+    ])
+    print(row.title, tags)
+    return '---\ntitle: %s\ntags: %s\n---' % (row.title, ', '.join(tags))
+
 def get_markdown_from_page(block):
     print('traverse', block)
     if type(block) is notion.collection.CollectionRowBlock:
-        return (
-            block.get_property('title') + '\n\n' +
-            '\n\n'.join([
-                get_markdown_from_page(child)
-                for child in block.children
-            ])
-        )
+        return '\n\n'.join([
+            get_markdown_from_page(child)
+            for child in block.children
+        ])
     elif type(block) is notion.block.TextBlock:
         return block.title
     elif type(block) is notion.block.HeaderBlock:
@@ -45,14 +53,14 @@ def get_markdown_from_page(block):
     elif type(block) is notion.block.BulletedListBlock:
         row = '- ' + block.title
         subrows = ''.join([
-            '  ' + get_markdown_from_page(child)
+            '  ' + get_markdown_from_page(child).replace('\n', '\n  ')
             for child in block.children
         ])
         return row + '\n' + subrows
     elif type(block) is notion.block.NumberedListBlock:
         row = '1. ' + block.title
         subrows = ''.join([
-            '  ' + get_markdown_from_page(child)
+            '  ' + get_markdown_from_page(child).replace('\n', '\n  ')
             for child in block.children
         ])
         return row + '\n' + subrows
@@ -91,7 +99,8 @@ class RowSync:
         if (self.is_published):
             print('row updated, writing file', self.filename)
             with open(self.filename, 'w') as file_handle:
-                file_handle.write(get_markdown_from_page(self.row))
+                meta = get_post_meta(self.row)
+                file_handle.write(meta + '\n\n' + get_markdown_from_page(self.row))
         else:
             silent_rm(self.filename)
 
