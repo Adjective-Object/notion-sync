@@ -1,7 +1,8 @@
 from notion.client import NotionClient
 import os, sys, errno
-import json
 import asyncio
+import json
+from datetime import date
 
 def init():
     with open('./config.json') as config_file:
@@ -37,7 +38,6 @@ class RowSync:
         self.update_file()
 
     def update_file(self):
-        print('published?', self.is_published)
         if (self.is_published):
             print('row updated, writing file', self.filename)
             with open(self.filename, 'w') as file_handle:
@@ -55,9 +55,20 @@ class RowSync:
 
     @property
     def is_published(self):
-        return any([
+        is_published_status = any([
             self.row.get_property(entry['id']) == 'Published' for entry in self.row.schema if entry['name'] == "Status"
         ])
+
+        publish_dates = [
+            self.row.get_property(entry['id'])
+                for entry in self.row.schema
+                if (entry['name'] == "Publish Date"
+                    and entry['type'] == 'date')
+        ]
+        dates = [publish_date.start for publish_date in publish_dates if publish_date is not None];
+        is_published_date = len(dates) != 0 and max(dates) <= date.today()
+
+        return is_published_status and is_published_date
 
 class CollectionFileSync:
     def __init__(self, collection_view, root_dir):
