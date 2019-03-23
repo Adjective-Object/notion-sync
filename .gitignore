@@ -124,3 +124,6 @@ dmypy.json
 
 # secrets
 config.json
+
+# tool output
+out
