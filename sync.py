@@ -1,4 +1,6 @@
 from notion.client import NotionClient
+from notion.markdown import notion_to_markdown
+import notion
 import os, sys, errno
 import asyncio
 import json
@@ -22,10 +24,58 @@ def silent_rm(filename):
         if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
             raise # re-raise exception if a different error occurred
 
-def get_markdown_from_page(page):
-    # TODO markdown conversion
-    print(type(page), page, dir(page), page)
-    return page.id
+def get_markdown_from_page(block):
+    print('traverse', block)
+    if type(block) is notion.collection.CollectionRowBlock:
+        return (
+            block.get_property('title') + '\n\n' +
+            '\n\n'.join([
+                get_markdown_from_page(child)
+                for child in block.children
+            ])
+        )
+    elif type(block) is notion.block.TextBlock:
+        return block.title
+    elif type(block) is notion.block.HeaderBlock:
+        return '# ' + block.title
+    elif type(block) is notion.block.SubheaderBlock:
+        return '## ' + block.title
+    elif block.type == 'sub_sub_header':
+        return '### ' + notion_to_markdown(block._get_record_data()['properties']['title'])
+    elif type(block) is notion.block.BulletedListBlock:
+        row = '- ' + block.title
+        subrows = ''.join([
+            '  ' + get_markdown_from_page(child)
+            for child in block.children
+        ])
+        return row + '\n' + subrows
+    elif type(block) is notion.block.NumberedListBlock:
+        row = '1. ' + block.title
+        subrows = ''.join([
+            '  ' + get_markdown_from_page(child)
+            for child in block.children
+        ])
+        return row + '\n' + subrows
+    elif type(block) is notion.block.ColumnListBlock:
+        subsections = '\n'.join([
+            get_markdown_from_page(child)
+            for child in block.children
+        ])
+        return '<section style="display:flex;">\n%s\n</section>' % subsections
+    elif type(block) is notion.block.ColumnBlock:
+        return '<section style="flex: %s">\n%s\n</section>' % (
+            block.column_ratio,
+            '\n'.join(get_markdown_from_page(child) for child in block.children)
+        )
+    elif type(block) is notion.block.ImageBlock:
+        raw_source = notion_to_markdown(block._get_record_data()['properties']['source'])
+        return '![%s](%s)' % (
+            os.path.basename(raw_source),
+            block.source
+        )
+    else:
+        print(type(block), block, block._get_record_data())
+        return str(block)
 
 class RowSync:
     def __init__(self, root_dir, row):
