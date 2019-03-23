@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "2b3a85dc0aeae6fd56e2bcd42126cd38d1c1e30339b3d9225a05fb39f8d81eff"
+            "sha256": "199abf16c150f4a792aff03ddf35443a38a424c00c1aaaf467970855d0d3623c"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -16,6 +16,13 @@
         ]
     },
     "default": {
+        "autopep8": {
+            "hashes": [
+                "sha256:33d2b5325b7e1afb4240814fe982eea3a92ebea712869bfd08b3c0393404248c"
+            ],
+            "index": "pypi",
+            "version": "==1.4.3"
+        },
         "beautifulsoup4": {
             "hashes": [
                 "sha256:034740f6cb549b4e932ae1ab975581e6103ac8f942200a0e9759065984391858",
@@ -82,6 +89,13 @@
             "editable": true,
             "git": "https://github.com/evertheylen/notion-py.git",
             "ref": "8e25b3ef6bcc6ad42b8e0733415879f45caf1079"
+        },
+        "pycodestyle": {
+            "hashes": [
+                "sha256:95a2219d12372f05704562a14ec30bc76b05a5b297b21a5dfe3f6fac3491ae56",
+                "sha256:e40a936c9a450ad81df37f549d676d127b1b66000a6c500caa2b085bc0ca976c"
+            ],
+            "version": "==2.5.0"
         },
         "python-slugify": {
             "hashes": [

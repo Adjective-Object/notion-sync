@@ -2,7 +2,9 @@ from notion.client import NotionClient
 from notion.markdown import notion_to_markdown
 import notion
 from shutil import rmtree
-import os, sys, errno
+import os
+import sys
+import errno
 import asyncio
 import json
 from datetime import date
@@ -10,6 +12,7 @@ from itertools import chain
 
 
 synced_files = dict()
+
 
 def init():
     with open('./config.json') as config_file:
@@ -21,23 +24,26 @@ def init():
             config['destination']
         )
 
+
 def get_post_meta(row):
     tags = chain(*[
         row.get_property(entry['id'])
-            for entry in row.schema
-                if (entry['name'] == "Tags"
-                   and entry['type'] == 'multi_select')
+        for entry in row.schema
+        if (entry['name'] == "Tags"
+            and entry['type'] == 'multi_select')
     ])
     return '---\ntitle: %s\ntags: %s\n---' % (row.title, ', '.join(tags))
+
 
 def get_row_publish_date(row):
     publish_dates = [
         row.get_property(entry['id'])
-            for entry in row.schema
-            if (entry['name'] == "Publish Date"
-                and entry['type'] == 'date')
+        for entry in row.schema
+        if (entry['name'] == "Publish Date"
+            and entry['type'] == 'date')
     ]
-    dates = [publish_date.start for publish_date in publish_dates if publish_date is not None];
+    dates = [
+        publish_date.start for publish_date in publish_dates if publish_date is not None]
     return None if len(dates) == 0 else max(dates)
 
 
@@ -57,7 +63,7 @@ def is_row_published(row):
 
 def get_row_link_slug(row):
     publish_date = get_row_publish_date(row)
-    if publish_date == None:
+    if publish_date is None:
         return None
 
     return '-'.join(
@@ -69,11 +75,12 @@ def get_row_link_slug(row):
         row.title.split(' ')
     )
 
+
 class CollectionGeneratorContext:
 
     def __init__(self, collection_generator):
         self.collection_generator = collection_generator
-    
+
     def contains_row(self, block):
         # Explicitly opt not to support embedded subpages
         # (e.g. subpages that are _indirect_ descendents of the collection)
@@ -86,6 +93,7 @@ class CollectionGeneratorContext:
 
     def get_block_url(self, block):
         return './' + get_row_link_slug(block)
+
 
 class MarkdownGenerator:
 
@@ -108,14 +116,14 @@ class MarkdownGenerator:
                 if not contains_row:
                     print('contains block?', contains_row)
                     return ''
-                
+
                 title = block.title if block.icon is None else '%s %s' % (
                     block.icon,
                     block.title
                 )
                 block_url = self.context.get_block_url(block)
 
-                return '[%s](%s)' %(
+                return '[%s](%s)' % (
                     title,
                     block_url
                 )
@@ -127,7 +135,9 @@ class MarkdownGenerator:
         elif type(block) is notion.block.SubheaderBlock:
             return '## ' + block.title
         elif block.type == 'sub_sub_header':
-            return '### ' + notion_to_markdown(block._get_record_data()['properties']['title'])
+            return '### ' + \
+                notion_to_markdown(
+                    block._get_record_data()['properties']['title'])
         elif type(block) is notion.block.BulletedListBlock:
             row = '- ' + block.title
             subrows = self.indent_children(block.children)
@@ -145,10 +155,12 @@ class MarkdownGenerator:
         elif type(block) is notion.block.ColumnBlock:
             return '<section style="flex: %s">\n%s\n</section>' % (
                 block.column_ratio,
-                '\n'.join(self.get_markdown_from_page(child) for child in block.children)
+                '\n'.join(self.get_markdown_from_page(child)
+                          for child in block.children)
             )
         elif type(block) is notion.block.ImageBlock:
-            raw_source = notion_to_markdown(block._get_record_data()['properties']['source'])
+            raw_source = notion_to_markdown(
+                block._get_record_data()['properties']['source'])
             return '![%s](%s)' % (
                 os.path.basename(raw_source),
                 block.source
@@ -166,7 +178,7 @@ class MarkdownGenerator:
         elif type(block) is notion.block.TodoBlock:
             row = '[%s] %s' % ('x' if block.checked else ' ', block.title)
             subrows = self.indent_children(block.children)
-            return row + '\n' + subrows 
+            return row + '\n' + subrows
         elif type(block) is notion.block.CollectionViewBlock:
             # TODO handle these if they are tables
         else:
@@ -224,6 +236,7 @@ class RowSync:
         # TODO format based on date of the entry
         return "%s/%s.md" % (self.root_dir, get_row_link_slug(self.row))
 
+
 class CollectionFileSync:
     '''
     Synchronizes a collection's rows to individual markdown files
@@ -258,8 +271,8 @@ class CollectionFileSync:
         added_row_ids = new_row_ids - old_row_ids
         removed_row_ids = old_row_ids - new_row_ids
 
-        print ("    added", added_row_ids, "removed", removed_row_ids)
-        
+        print("    added", added_row_ids, "removed", removed_row_ids)
+
         for added_row_id in added_row_ids:
             row_sync = RowSync(
                 self.root_dir,
@@ -272,6 +285,7 @@ class CollectionFileSync:
         for removed_row_id in removed_row_ids:
             self.known_rows[removed_row_id].remove_and_stop()
             del self.known_rows[removed_row_id]
+
 
 async def main():
     print('reading config')
