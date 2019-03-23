@@ -1,4 +1,11 @@
-## Setup
+## Setting up Notion
+
+- Create a collection table view
+- Add columns for
+  - Publish Date (type date)
+  - Status (type select, with Published as an option)
+
+## Setting up the Tool
 
 - copy `config-example.json` to `config.json`
 - set token_v2 to the value of your token_v2 token on a logged-in session of notion

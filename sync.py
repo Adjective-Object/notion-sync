@@ -1,5 +1,5 @@
 from notion.client import NotionClient
-import os, sys
+import os, sys, errno
 import json
 import asyncio
 
@@ -13,9 +13,17 @@ def init():
             config['destination']
         )
 
+
+def silent_rm(filename):
+    try:
+        os.remove(filename)
+    except OSError as e: # this would be "except OSError, e:" before Python 2.6
+        if e.errno != errno.ENOENT: # errno.ENOENT = no such file or directory
+            raise # re-raise exception if a different error occurred
+
 def get_markdown_from_page(page):
     # TODO markdown conversion
-    print(type(page), page)
+    print(type(page), page, dir(page), page)
     return page.id
 
 class RowSync:
@@ -29,17 +37,27 @@ class RowSync:
         self.update_file()
 
     def update_file(self):
-        print('row updated, writing file', self.filename)
-        with open(self.filename, 'w') as file_handle:
-            file_handle.write(get_markdown_from_page(self.row))
+        print('published?', self.is_published)
+        if (self.is_published):
+            print('row updated, writing file', self.filename)
+            with open(self.filename, 'w') as file_handle:
+                file_handle.write(get_markdown_from_page(self.row))
+        else:
+            silent_rm(self.filename)
 
     def remove_and_stop(self):
         self.row.remove_callbacks(self.callback_id)
-        os.remove(self.filename)
+        silent_rm(self.filename)
 
     def _get_sync_filename(self):
         # TODO format based on date of the entry
         return "%s/%s.md" % (self.root_dir, self.row.id)
+
+    @property
+    def is_published(self):
+        return any([
+            self.row.get_property(entry['id']) == 'Published' for entry in self.row.schema if entry['name'] == "Status"
+        ])
 
 class CollectionFileSync:
     def __init__(self, collection_view, root_dir):
