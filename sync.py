@@ -15,9 +15,6 @@ from itertools import chain
 import argparse
 
 
-synced_files = dict()
-
-
 def rm_file(filepath):
     if os.path.exists(filepath):
         filestat = os.stat(filepath)
