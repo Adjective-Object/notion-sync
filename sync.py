@@ -1,7 +1,6 @@
 from notion.client import NotionClient
 from notion.markdown import notion_to_markdown
 import notion
-from shutil import rmtree
 import os
 import sys
 import errno
@@ -32,7 +31,7 @@ def get_post_meta(row):
         if (entry['name'] == "Tags"
             and entry['type'] == 'multi_select')
     ])
-    return '---\ntitle: %s\ntags: %s\n---' % (row.title, ', '.join(tags))
+    return '---\ntitle: %s\ntags: %s\n---' % (get_decorated_row_title(row), ', '.join(tags))
 
 
 def get_row_publish_date(row):
@@ -87,12 +86,19 @@ class CollectionGeneratorContext:
         is_block_in_root_collection = block.collection.id == self.collection_generator.collection.id
         return (
             is_block_in_root_collection
-            and type(block) is notion.collection.CollectionRowBlock
+            and isinstance(block, notion.collection.CollectionRowBlock)
             and is_row_published(block)
         )
 
     def get_block_url(self, block):
-        return './' + get_row_link_slug(block)
+        return '/posts/' + get_row_link_slug(block)
+
+
+def get_decorated_row_title(block):
+    return block.title if block.icon is None else '%s %s' % (
+        block.icon,
+        block.title
+    )
 
 
 class MarkdownGenerator:
@@ -102,13 +108,13 @@ class MarkdownGenerator:
 
     def get_markdown_from_page(self, block, is_page_root=False):
         # print('traverse', type(block), block)
-        if type(block) is notion.collection.CollectionRowBlock:
+        if isinstance(block, notion.collection.CollectionRowBlock):
             if is_page_root:
                 # if we are on the page root, traverse the subpage
-                return '\n\n'.join([
+                return '\n\n'.join([md for md in [
                     self.get_markdown_from_page(child)
                     for child in block.children
-                ])
+                ] if md is not None])
             else:
                 # otherwise, just link to the page
 
@@ -117,70 +123,69 @@ class MarkdownGenerator:
                     print('contains block?', contains_row)
                     return ''
 
-                title = block.title if block.icon is None else '%s %s' % (
-                    block.icon,
-                    block.title
-                )
                 block_url = self.context.get_block_url(block)
 
                 return '[%s](%s)' % (
-                    title,
+                    get_decorated_row_title(block),
                     block_url
                 )
 
-        elif type(block) is notion.block.TextBlock:
+        elif isinstance(block, notion.block.TextBlock):
             return block.title
-        elif type(block) is notion.block.HeaderBlock:
+        elif isinstance(block, notion.block.HeaderBlock):
             return '# ' + block.title
-        elif type(block) is notion.block.SubheaderBlock:
+        elif isinstance(block, notion.block.SubheaderBlock):
             return '## ' + block.title
         elif block.type == 'sub_sub_header':
             return '### ' + \
                 notion_to_markdown(
                     block._get_record_data()['properties']['title'])
-        elif type(block) is notion.block.BulletedListBlock:
+        elif isinstance(block, notion.block.BulletedListBlock):
             row = '- ' + block.title
             subrows = self.indent_children(block.children)
             return row + '\n' + subrows
-        elif type(block) is notion.block.NumberedListBlock:
+        elif isinstance(block, notion.block.NumberedListBlock):
             row = '1. ' + block.title
             subrows = self.indent_children(block.children)
             return row + '\n' + subrows
-        elif type(block) is notion.block.ColumnListBlock:
+        elif isinstance(block, notion.block.ColumnListBlock):
             subsections = '\n'.join([
                 self.get_markdown_from_page(child)
                 for child in block.children
             ])
-            return '<section style="display:flex;">\n%s\n</section>' % subsections
-        elif type(block) is notion.block.ColumnBlock:
+            return '<section class="columnSplit" style="display:flex;">\n%s\n</section>' % subsections
+        elif isinstance(block, notion.block.ColumnBlock):
             return '<section style="flex: %s">\n%s\n</section>' % (
                 block.column_ratio,
                 '\n'.join(self.get_markdown_from_page(child)
                           for child in block.children)
             )
-        elif type(block) is notion.block.ImageBlock:
+        elif isinstance(block, notion.block.ImageBlock):
             raw_source = notion_to_markdown(
                 block._get_record_data()['properties']['source'])
-            return '![%s](%s)' % (
-                os.path.basename(raw_source),
+            return '![](%s)' % (
+                # os.path.basename(raw_source),
                 block.source
             )
-        elif type(block) is notion.block.CodeBlock:
+        elif isinstance(block, notion.block.CodeBlock):
             code_source = block.title
             code_language = block.language
             return '```%s\n%s\n```' % (
                 code_language,
                 code_source
             )
-        elif type(block) is notion.block.QuoteBlock:
+        elif isinstance(block, notion.block.QuoteBlock):
             quote_body = block.title
             return '> ' + '\n> '.join(quote_body.split('\n'))
-        elif type(block) is notion.block.TodoBlock:
+        elif isinstance(block, notion.block.TodoBlock):
             row = '[%s] %s' % ('x' if block.checked else ' ', block.title)
             subrows = self.indent_children(block.children)
             return row + '\n' + subrows
-        elif type(block) is notion.block.CollectionViewBlock:
+        elif isinstance(block, notion.block.DividerBlock):
+            return '---\n'
+        elif isinstance(block, notion.block.CollectionViewBlock):
             # TODO handle these if they are tables
+            pass
         else:
             print('encountered unknown block type')
             print(type(block), block, block._get_record_data())
@@ -188,8 +193,13 @@ class MarkdownGenerator:
 
     def indent_children(self, children):
         return ''.join([
-            '  ' + self.get_markdown_from_page(child).replace('\n', '\n  ')
-            for child in children
+            '  ' + md.replace('\n', '\n  ')
+            for md in
+            [
+                self.get_markdown_from_page(child)
+                for child in children
+            ]
+            if md is not None
         ])
 
 
@@ -210,7 +220,8 @@ class RowSync:
 
     def update_file(self):
         if (self.filename != self._get_sync_filename()):
-            rmtree(self.filename, ignore_errors=True)
+            print('removing old file at ', self.filename)
+            os.remove(self.filename)
             self.filename = self._get_sync_filename()
 
         if (is_row_published(self.row)):
@@ -225,12 +236,14 @@ class RowSync:
                         is_page_root=True
                     )
                 )
-        else:
-            rmtree(self.filename, ignore_errors=True)
+        elif os.path.exists(self.filename):
+            filestat = os.stat(self.filename)
+            if filestate is not None and filestat.is_file():
+                os.remove(self.filename)
 
     def remove_and_stop(self):
         self.row.remove_callbacks(self.callback_id)
-        rmtree(self.filename, ignore_errors=True)
+        os.remove(self.filename)
 
     def _get_sync_filename(self):
         # TODO format based on date of the entry
@@ -290,8 +303,7 @@ class CollectionFileSync:
 async def main():
     print('reading config')
     client, root_view, destination_dir = init()
-    print('making out file')
-    rmtree(destination_dir, ignore_errors=True)
+    print('making out dir')
     os.makedirs(destination_dir, exist_ok=True)
 
     print('got root')
