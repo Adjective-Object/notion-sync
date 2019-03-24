@@ -331,7 +331,7 @@ class CollectionFileSync:
                 self.known_rows[added_row_id].update_file()
 
 
-async def main():
+async def async_main():
     args = parse_args()
     client, root_view, destination_dir = load_config_file(args.config)
 
@@ -383,5 +383,9 @@ def parse_args():
     return parser.parse_args(sys.argv[1:])
 
 
+def main():
+    asyncio.run(async_main())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
