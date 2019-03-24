@@ -7,7 +7,10 @@ verify_ssl = true
 
 [packages]
 notion = {editable = true,git = "https://github.com/evertheylen/notion-py.git"}
-autopep8 = {editable = true,version = "*"}
+black = {editable = true,version = "*"}
 
 [requires]
 python_version = "3.7"
+
+[pipenv]
+allow_prereleases = true

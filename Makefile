@@ -3,10 +3,10 @@
 test: lint-check
 
 lint-check:
-	pipenv run autopep8 --exit-code *.py > /dev/null
+	pipenv run black --check *.py
 
 lint:
-	pipenv run autopep8 --in-place --aggressive *.py
+	pipenv run black *.py
 
 setup:
 	pip install pipenv
