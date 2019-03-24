@@ -15,14 +15,22 @@ from itertools import chain
 import argparse
 
 
-def rm_file(filepath):
+def is_file(filepath):
     if os.path.exists(filepath):
         filestat = os.stat(filepath)
-        if filestat is not None and stat.S_ISDIR(filestat.st_mode):
-            os.remove(filepath)
+        return filestat is not None and not stat.S_ISDIR(filestat.st_mode)
+    return False
+
+
+def rm_file(filepath):
+    if is_file(filepath):
+        os.remove(filepath)
 
 
 def load_config_file(config_json_path):
+    if not is_file(config_json_path):
+        sys.exit("config file '%s' not found" % config_json_path)
+
     with open(config_json_path) as config_file:
         config = json.load(config_file)
         client = NotionClient(token_v2=config["token_v2"])

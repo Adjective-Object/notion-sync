@@ -1,5 +1,7 @@
 # notion-sync
 
+![](https://www.travis-ci.org/Adjective-Object/notion-md-sync.svg?branch=master) ![](https://img.shields.io/badge/straight-passing-brightgreen.svg)
+
 A tool to sync a notion collection to markdown files
 
 ## Setting up Notion
