@@ -12,10 +12,12 @@ from itertools import chain
 
 synced_files = dict()
 
+
 def rm_file(filepath):
     filestat = os.stat(filepath)
     if filestat is not None and filestat.is_file():
         os.remove(filepath)
+
 
 def init():
     with open('./config.json') as config_file:
@@ -35,7 +37,8 @@ def get_post_meta(row):
         if (entry['name'] == "Tags"
             and entry['type'] == 'multi_select')
     ])
-    return '---\ntitle: %s\ntags: %s\n---' % (get_decorated_row_title(row), ', '.join(tags))
+    return '---\ntitle: %s\ntags: %s\n---' % (
+        get_decorated_row_title(row), ', '.join(tags))
 
 
 def get_row_publish_date(row):
@@ -49,10 +52,12 @@ def get_row_publish_date(row):
         publish_date.start for publish_date in publish_dates if publish_date is not None]
     return None if len(dates) == 0 else max(dates)
 
+
 def set_row_status(row, value):
     for entry in row.schema:
         if entry['name'] == "Status":
             row.set_property(entry['id'], value)
+
 
 def set_row_published_pending(row):
     '''
@@ -67,13 +72,13 @@ def set_row_published_pending(row):
     else:
         set_row_status(row, 'Published')
 
+
 def is_row_published(row):
     is_published_status = any([
         row.get_property(entry['id']) in 'Published' for entry in row.schema if entry['name'] == "Status"
     ])
 
     return is_published_status
-
 
 
 def get_row_link_slug(row):
