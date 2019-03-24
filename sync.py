@@ -1,26 +1,32 @@
+#!/usr/bin/env python
+
 from notion.client import NotionClient
 from notion.markdown import notion_to_markdown
 import notion
 import os
+import stat
 import sys
 import errno
 import asyncio
 import json
+from shutil import rmtree
 from datetime import date
 from itertools import chain
+import argparse
 
 
 synced_files = dict()
 
 
 def rm_file(filepath):
-    filestat = os.stat(filepath)
-    if filestat is not None and filestat.is_file():
-        os.remove(filepath)
+    if os.path.exists(filepath):
+        filestat = os.stat(filepath)
+        if filestat is not None and stat.S_ISDIR(filestat.st_mode):
+            os.remove(filepath)
 
 
-def init():
-    with open("./config.json") as config_file:
+def load_config_file(config_json_path):
+    with open(config_json_path) as config_file:
         config = json.load(config_file)
         client = NotionClient(token_v2=config["token_v2"])
         return (
@@ -90,13 +96,15 @@ def is_row_published(row):
 
 def get_row_link_slug(row):
     publish_date = get_row_publish_date(row)
-    if publish_date is None:
-        return None
 
-    return "-".join(
-        ["%04d-%02d-%02d" % (publish_date.year, publish_date.month, publish_date.day)]
-        + row.title.split(" ")
+    publish_date_slug = (
+        "0000-00-00"
+        if publish_date is None
+        else "%04d-%02d-%02d"
+        % (publish_date.year, publish_date.month, publish_date.day)
     )
+
+    return "-".join([publish_date_slug] + row.title.split(" "))
 
 
 class CollectionGeneratorContext:
@@ -144,10 +152,8 @@ class MarkdownGenerator:
                 )
             else:
                 # otherwise, just link to the page
-
                 contains_row = self.context.contains_row(block)
                 if not contains_row:
-                    print("contains block?", contains_row)
                     return ""
 
                 block_url = self.context.get_block_url(block)
@@ -237,7 +243,7 @@ class RowSync:
         self.markdown_generator = markdown_generator
         self.filename = self._get_sync_filename()
 
-    def start(self):
+    def start_watching(self):
         self.callback_id = self.row.add_callback(self.update_file)
         self.update_file()
 
@@ -246,12 +252,11 @@ class RowSync:
         set_row_published_pending(self.row)
 
         if self.filename != self._get_sync_filename():
-            print("removing old file at ", self.filename)
             rm_file(self.filename)
             self.filename = self._get_sync_filename()
 
         if is_row_published(self.row):
-            print("row updated, writing file", self.filename)
+            print("writing file", self.filename)
             with open(self.filename, "w") as file_handle:
                 meta = get_post_meta(self.row)
                 file_handle.write(
@@ -261,12 +266,10 @@ class RowSync:
                         self.row, is_page_root=True
                     )
                 )
-        elif os.path.exists(self.filename):
-            filestat = os.stat(self.filename)
-            if filestat is not None and filestat.is_file():
-                rm_file(self.filename)
+        else:
+            rm_file(self.filename)
 
-    def remove_and_stop(self):
+    def stop_watching_and_remove(self):
         self.row.remove_callbacks(self.callback_id)
         os.remove(self.filename)
 
@@ -282,18 +285,19 @@ class CollectionFileSync:
     Tracks row addition / removal
     """
 
-    def __init__(self, collection, root_dir):
+    def __init__(self, collection, root_dir, watch=False):
         self.collection = collection
         self.root_dir = root_dir
         self.markdown_generator = MarkdownGenerator(CollectionGeneratorContext(self))
+        self.watch = watch
 
         self.known_rows = dict()
 
-    def start(self):
+    def start_watching(self):
         self.callback = self.collection.add_callback(self.sync_rows)
         self.sync_rows()
 
-    def stop(self):
+    def stop_watching(self):
         self.collection.add_callback(self.sync_rows)
         self.sync_rows()
 
@@ -307,35 +311,79 @@ class CollectionFileSync:
         added_row_ids = new_row_ids - old_row_ids
         removed_row_ids = old_row_ids - new_row_ids
 
-        print("    added", added_row_ids, "removed", removed_row_ids)
-
         for added_row_id in added_row_ids:
-            row_sync = RowSync(
-                self.root_dir, rows_dict[added_row_id], self.markdown_generator
-            )
+            row = rows_dict[added_row_id]
+            print("tracking (id=%s) %s" % (row.id, get_row_link_slug(row)))
+            row_sync = RowSync(self.root_dir, row, self.markdown_generator)
             self.known_rows[added_row_id] = row_sync
-            row_sync.start()
 
         for removed_row_id in removed_row_ids:
-            self.known_rows[removed_row_id].remove_and_stop()
+            print(
+                "removing (id=%s) %s "
+                % (row.id, self.known_rows[removed_row_id].filename)
+            )
+            self.known_rows[removed_row_id].stop_watching_and_remove()
             del self.known_rows[removed_row_id]
+
+        # run generation after adding all rows to make sure state is sane when
+        # trying to calculate between-page-links
+        for added_row_id in added_row_ids:
+            if self.watch:
+                self.known_rows[added_row_id].start_watching()
+            else:
+                self.known_rows[added_row_id].update_file()
 
 
 async def main():
-    print("reading config")
-    client, root_view, destination_dir = init()
-    print("making out dir")
+    args = parse_args()
+    client, root_view, destination_dir = load_config_file(args.config)
+
+    # create destination
+    if args.clean:
+        rmtree(destination_dir, ignore_errors=True)
     os.makedirs(destination_dir, exist_ok=True)
 
-    print("got root")
-    sync = CollectionFileSync(root_view.collection, destination_dir)
-    print("starting sync")
-    sync.start()
+    collectionRoot = CollectionFileSync(
+        root_view.collection, destination_dir, watch=args.watch
+    )
 
-    print("entering indefinite wait")
-    while True:
-        sys.stdout.flush()
-        await asyncio.sleep(1)
+    if args.watch:
+        collectionRoot.start_watching()
+        while True:
+            sys.stdout.flush()
+            await asyncio.sleep(1)
+    else:
+        collectionRoot.sync_rows()
+        print("Done!")
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description="Synchronizes markdown documents from a notion Collection View"
+    )
+    parser.add_argument(
+        "--config",
+        "-c",
+        metavar="config",
+        type=str,
+        default="./config.json",
+        help="Path to a config file",
+    )
+    parser.add_argument(
+        "--watch",
+        dest="watch",
+        action="store_true",
+        default=False,
+        help="run in polling/watch mode",
+    )
+    parser.add_argument(
+        "--clean",
+        dest="clean",
+        action="store_true",
+        default=False,
+        help="Clean destination directory before running",
+    )
+    return parser.parse_args(sys.argv[1:])
 
 
 if __name__ == "__main__":
