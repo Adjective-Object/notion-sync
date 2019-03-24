@@ -3,10 +3,10 @@
 test: lint-check
 
 lint-check:
-	pipenv run black --check **/*.py
+	pipenv run black --check *.py **/*.py
 
 lint:
-	pipenv run black **/*.py
+	pipenv run black *.py **/*.py
 
 setup:
 	pip install pipenv
@@ -15,12 +15,17 @@ setup:
 clean:
 	rm -rf dist
 
-package: requirements.txt clean
+package: requirements.txt clean *.py */*.py
 	pipenv run python setup.py sdist bdist_wheel
 
-publish-test: package
+check-package: package
 	twine check dist/*
+
+publish-test: check-package
 	twine upload --repository-url https://test.pypi.org/legacy/ dist/* 
+
+publish-prod: check-package
+	twine upload dist/*
 
 requirements.txt:
 	pipenv lock --requirements > $@
