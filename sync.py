@@ -12,6 +12,10 @@ from itertools import chain
 
 synced_files = dict()
 
+def rm_file(filepath):
+    filestat = os.stat(filepath)
+    if filestat is not None and filestat.is_file():
+        os.remove(filepath)
 
 def init():
     with open('./config.json') as config_file:
@@ -45,19 +49,31 @@ def get_row_publish_date(row):
         publish_date.start for publish_date in publish_dates if publish_date is not None]
     return None if len(dates) == 0 else max(dates)
 
+def set_row_status(row, value):
+    for entry in row.schema:
+        if entry['name'] == "Status":
+            row.set_property(entry['id'], value)
+
+def set_row_published_pending(row):
+    '''
+    Sets a row's status to either Published, Pending, or None based on
+    if it has an assigned publish date
+    '''
+    publish_date = get_row_publish_date(row)
+    if publish_date is None:
+        set_row_status(row, 'Unpublished')
+    elif publish_date > date.today():
+        set_row_status(row, 'Pending')
+    else:
+        set_row_status(row, 'Published')
 
 def is_row_published(row):
     is_published_status = any([
-        row.get_property(entry['id']) == 'Published' for entry in row.schema if entry['name'] == "Status"
+        row.get_property(entry['id']) in 'Published' for entry in row.schema if entry['name'] == "Status"
     ])
 
-    publish_date = get_row_publish_date(row)
-    is_published_date = (
-        publish_date
-        and publish_date <= date.today()
-    )
+    return is_published_status
 
-    return is_published_status and is_published_date
 
 
 def get_row_link_slug(row):
@@ -219,9 +235,12 @@ class RowSync:
         self.update_file()
 
     def update_file(self):
+        # Make sure the data on the row is consistent
+        set_row_published_pending(self.row)
+
         if (self.filename != self._get_sync_filename()):
             print('removing old file at ', self.filename)
-            os.remove(self.filename)
+            rm_file(self.filename)
             self.filename = self._get_sync_filename()
 
         if (is_row_published(self.row)):
@@ -238,8 +257,8 @@ class RowSync:
                 )
         elif os.path.exists(self.filename):
             filestat = os.stat(self.filename)
-            if filestate is not None and filestat.is_file():
-                os.remove(self.filename)
+            if filestat is not None and filestat.is_file():
+                rm_file(self.filename)
 
     def remove_and_stop(self):
         self.row.remove_callbacks(self.callback_id)
