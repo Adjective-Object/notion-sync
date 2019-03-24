@@ -11,3 +11,9 @@ lint:
 setup:
 	pip install pipenv
 	pipenv install --dev --three
+
+package: requirements.txt
+	
+
+requirements.txt:
+	pipenv lock --requirements > $@

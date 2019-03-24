@@ -1,3 +1,7 @@
+# notion-sync
+
+A tool to sync a notion collection to markdown files
+
 ## Setting up Notion
 
 - Create a collection table view

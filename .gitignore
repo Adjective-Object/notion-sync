@@ -127,3 +127,6 @@ config.json
 
 # tool output
 out
+
+# build intermediates
+requirements.txt
