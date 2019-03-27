@@ -20,7 +20,7 @@ package: requirements.txt clean *.py */*.py
 	pipenv run python setup.py sdist bdist_wheel
 
 requirements.txt:
-	pipenv_to_requirements
+	pipenv run pipenv_to_requirements
 
 #---- Publishing ----
 
