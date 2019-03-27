@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+set -ex
 
 CURRENT_VERSION=$(cat .bumpversion.cfg | grep current_version | sed 's/.*= //')
 echo "compare against $CURRENT_VERSION"

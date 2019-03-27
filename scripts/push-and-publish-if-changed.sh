@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+set -ex
+
 git branch
 git log -1 
 git diff --exit-code master origin/master
