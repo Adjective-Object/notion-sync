@@ -38,9 +38,8 @@ publish-travis: check-package
 
 travis:
 	make test
-	if [ "$$TRAVIS_BRANCH" = "master" ]; then \
-		git checkout master ;\
-		./scripts/bump-version-from-commit.sh ;\
-		./scripts/push-and-publish-if-changed.sh ;\
-	fi
 
+travis-deploy:
+	git checkout master ;
+	./scripts/bump-version-from-commit.sh ;
+	./scripts/push-and-publish-if-changed.sh ;

@@ -8,3 +8,9 @@ env:
     - PIPENV_IGNORE_VIRTUALENVS=1
 install: make setup
 script: make travis
+deploy:
+  skip_cleanup: true
+  provider: script
+  script: make travis-deploy
+  on:
+    branch: master
