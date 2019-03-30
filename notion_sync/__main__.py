@@ -188,13 +188,13 @@ class MarkdownGenerator:
                 [self.get_markdown_from_page(child) for child in block.children]
             )
             return (
-                '<section class="columnSplit" style="display:flex;">\n%s\n</section>'
+                '<section class="columnSplit" style="display:flex;">%s</section>'
                 % subsections
             )
         elif isinstance(block, notion.block.ColumnBlock):
-            return '<section style="flex: %s">\n%s\n</section>' % (
+            return '<section style="flex: %s; padding: 0.5em">\n%s\n\n</section>' % (
                 block.column_ratio,
-                "\n".join(
+                "\n\n".join(
                     self.get_markdown_from_page(child) for child in block.children
                 ),
             )
@@ -208,7 +208,7 @@ class MarkdownGenerator:
             )
         elif isinstance(block, notion.block.CodeBlock):
             code_source = block.title
-            code_language = block.language
+            code_language = block.language if block.language != "Plain Text" else ""
             return "```%s\n%s\n```" % (code_language, code_source)
         elif isinstance(block, notion.block.QuoteBlock):
             quote_body = block.title
