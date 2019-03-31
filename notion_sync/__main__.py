@@ -81,22 +81,21 @@ def set_row_published_pending(row):
     publish_date = get_row_publish_date(row)
     if publish_date is None:
         set_row_status(row, "Unpublished")
-    elif publish_date > date.today():
-        set_row_status(row, "Pending")
-    else:
-        set_row_status(row, "Published")
+    elif not is_row_status(row, "Incomplete"):
+        if publish_date > date.today():
+            set_row_status(row, "Pending")
+        else:
+            set_row_status(row, "Published")
 
 
-def is_row_published(row):
-    is_published_status = any(
+def is_row_status(row, row_status):
+    return any(
         [
-            row.get_property(entry["id"]) in "Published"
+            row.get_property(entry["id"]) in row_status
             for entry in row.schema
             if entry["name"] == "Status"
         ]
     )
-
-    return is_published_status
 
 
 def get_row_link_slug(row):
@@ -113,19 +112,19 @@ def get_row_link_slug(row):
 
 
 class CollectionGeneratorContext:
-    def __init__(self, collection_generator):
-        self.collection_generator = collection_generator
+    def __init__(self, collection_file_sync):
+        self.collection_file_sync = collection_file_sync
 
     def contains_row(self, block):
         # Explicitly opt not to support embedded subpages
         # (e.g. subpages that are _indirect_ descendents of the collection)
         is_block_in_root_collection = (
-            block.collection.id == self.collection_generator.collection.id
+            block.collection.id == self.collection_file_sync.collection.id
         )
         return (
             is_block_in_root_collection
             and isinstance(block, notion.collection.CollectionRowBlock)
-            and is_row_published(block)
+            and self.collection_file_sync.is_row_published(block)
         )
 
     def get_block_url(self, block):
@@ -140,7 +139,12 @@ class MarkdownGenerator:
     def __init__(self, context):
         self.context = context
 
-    def get_markdown_from_page(self, block, is_page_root=False):
+    def get_markdown_from_page(self, page):
+        if not self.context.contains_row(page):
+            return None
+        return self.get_markdown_from_block(page, is_page_root=True)
+
+    def get_markdown_from_block(self, block, is_page_root=False):
         # print('traverse', type(block), block)
         if isinstance(block, notion.collection.CollectionRowBlock):
             if is_page_root:
@@ -149,7 +153,7 @@ class MarkdownGenerator:
                     [
                         md
                         for md in [
-                            self.get_markdown_from_page(child)
+                            self.get_markdown_from_block(child)
                             for child in block.children
                         ]
                         if md is not None
@@ -185,7 +189,7 @@ class MarkdownGenerator:
             return row + "\n" + subrows
         elif isinstance(block, notion.block.ColumnListBlock):
             subsections = "\n".join(
-                [self.get_markdown_from_page(child) for child in block.children]
+                [self.get_markdown_from_block(child) for child in block.children]
             )
             return (
                 '<section class="columnSplit" style="display:flex;">%s</section>'
@@ -195,16 +199,16 @@ class MarkdownGenerator:
             return '<section style="flex: %s; padding: 0.5em">\n%s\n\n</section>' % (
                 block.column_ratio,
                 "\n\n".join(
-                    self.get_markdown_from_page(child) for child in block.children
+                    self.get_markdown_from_block(child) for child in block.children
                 ),
             )
         elif isinstance(block, notion.block.ImageBlock):
             raw_source = notion_to_markdown(
                 block._get_record_data()["properties"]["source"]
             )
-            return "![](%s)" % (
-                # os.path.basename(raw_source),
-                block.source
+            return "![%s](%s)" % (
+                block.caption if block.caption != None else "",
+                block.source,
             )
         elif isinstance(block, notion.block.CodeBlock):
             code_source = block.title
@@ -231,7 +235,7 @@ class MarkdownGenerator:
         return "".join(
             [
                 "  " + md.replace("\n", "\n  ")
-                for md in [self.get_markdown_from_page(child) for child in children]
+                for md in [self.get_markdown_from_block(child) for child in children]
                 if md is not None
             ]
         )
@@ -260,17 +264,12 @@ class RowSync:
             rm_file(self.filename)
             self.filename = self._get_sync_filename()
 
-        if is_row_published(self.row):
-            print("writing file", self.filename)
+        md_content = self.markdown_generator.get_markdown_from_page(self.row)
+
+        if md_content != None:
             with open(self.filename, "w") as file_handle:
                 meta = get_post_meta(self.row)
-                file_handle.write(
-                    meta
-                    + "\n\n"
-                    + self.markdown_generator.get_markdown_from_page(
-                        self.row, is_page_root=True
-                    )
-                )
+                file_handle.write(meta + "\n\n" + md_content)
         else:
             rm_file(self.filename)
 
@@ -290,11 +289,12 @@ class CollectionFileSync:
     Tracks row addition / removal
     """
 
-    def __init__(self, collection, root_dir, watch=False):
+    def __init__(self, collection, root_dir, watch=False, draft=False):
         self.collection = collection
         self.root_dir = root_dir
         self.markdown_generator = MarkdownGenerator(CollectionGeneratorContext(self))
         self.watch = watch
+        self.draft = draft
 
         self.known_rows = dict()
 
@@ -338,6 +338,9 @@ class CollectionFileSync:
             else:
                 self.known_rows[added_row_id].update_file()
 
+    def is_row_published(self, row):
+        return self.draft or is_row_status(row, "Published")
+
 
 async def async_main():
     args = parse_args()
@@ -349,7 +352,7 @@ async def async_main():
     os.makedirs(destination_dir, exist_ok=True)
 
     collectionRoot = CollectionFileSync(
-        root_view.collection, destination_dir, watch=args.watch
+        root_view.collection, destination_dir, watch=args.watch, draft=args.draft
     )
 
     if args.watch:
@@ -387,6 +390,13 @@ def parse_args():
         action="store_true",
         default=False,
         help="Clean destination directory before running",
+    )
+    parser.add_argument(
+        "--draft",
+        dest="draft",
+        action="store_true",
+        default=False,
+        help="Build all blog entries, even unpublished ones.",
     )
     return parser.parse_args(sys.argv[1:])
 
