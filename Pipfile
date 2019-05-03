@@ -4,13 +4,14 @@ url = "https://pypi.org/simple"
 verify_ssl = true
 
 [dev-packages]
-black = {editable = true,version = "*"}
-bumpversion = {editable = true,version = "*"}
-twine = {editable = true,version = "*"}
+black = {version = "*",editable = true}
+bumpversion = {version = "*",editable = true}
+twine = {version = "*",editable = true}
 pipenv-to-requirements = "*"
 
 [packages]
-notion = {editable = true,git = "https://github.com/evertheylen/notion-py.git"}
+notion = {version = "*",editable = true}
+urllib3 = {version = ">=1.24.2",editable = true}
 
 [requires]
 python_version = "3.7"
