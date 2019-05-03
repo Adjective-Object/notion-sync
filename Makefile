@@ -19,7 +19,7 @@ clean:
 package: requirements.txt clean *.py */*.py
 	pipenv run python setup.py sdist bdist_wheel
 
-requirements.txt:
+requirements.txt: Pipfile Pipfile.lock
 	pipenv run pipenv_to_requirements
 
 #---- Publishing ----
