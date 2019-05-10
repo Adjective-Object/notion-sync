@@ -16,7 +16,7 @@ A tool to sync a notion collection to markdown files
   - Status (type select, with Published as an option)
   - Tags (type multi_select)
 
-## Setting up the Tool
+## Setting up you syncing directory
 
 - copy `config-example.json` to `config.json`
 - set token_v2 to the value of your token_v2 token on a logged-in session of notion
