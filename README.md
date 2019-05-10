@@ -1,5 +1,9 @@
 # notion-sync
 
+```
+pip install notion-sync
+```
+
 ![](https://www.travis-ci.org/Adjective-Object/notion-md-sync.svg?branch=master) ![](https://img.shields.io/badge/straight-passing-brightgreen.svg)
 
 A tool to sync a notion collection to markdown files
@@ -21,6 +25,5 @@ A tool to sync a notion collection to markdown files
 In the same directory as your config file, run:
 
 ```
-pip install notion-sync
 notion_sync
 ```
