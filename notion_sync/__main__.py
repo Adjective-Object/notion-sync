@@ -91,7 +91,7 @@ def set_row_published_pending(row):
 def is_row_status(row, row_status):
     return any(
         [
-            row.get_property(entry["id"]) in row_status
+            row.get_property(entry["id"]) == row_status
             for entry in row.schema
             if entry["name"] == "Status"
         ]
