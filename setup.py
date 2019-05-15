@@ -13,7 +13,7 @@ install_requires = [str(ir.req) for ir in reqs]
 
 setuptools.setup(
     name="notion_sync",
-    version="0.3.1",
+    version="0.3.2",
     author="Maxwell Huang-Hobbs",
     author_email="mhuan13+pypy@gmail.com",
     description="A tool to sync a notion collection to markdown files",
