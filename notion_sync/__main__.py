@@ -325,7 +325,7 @@ class CollectionFileSync:
         for removed_row_id in removed_row_ids:
             print(
                 "removing (id=%s) %s "
-                % (row.id, self.known_rows[removed_row_id].filename)
+                % (removed_row_id, self.known_rows[removed_row_id].filename)
             )
             self.known_rows[removed_row_id].stop_watching_and_remove()
             del self.known_rows[removed_row_id]
